@@ -25,8 +25,8 @@ module.exports = function () {
     app.use(methodOverride());
 
     app.use(session({
-        saveUnitialized: true,
-        resace: true,
+        saveUninitialized: true,
+        resave: true,
         secret: config.sessionSecret
     }));
 
