@@ -2,6 +2,7 @@
  * Created by akravets on 8/25/15.
  */
 var mongoose = require('mongoose'),
+    crypto = require('crypto'),
     Schema = mongoose.Schema;
 
 var UserSchema = new Schema({
@@ -9,14 +10,13 @@ var UserSchema = new Schema({
     lastName: String,
     email: {
         type: String,
-        index: true,
-        match: /.+\@.+\..+/
+        match: [/.+\@.+\..+/, "Please fill a valid e-mail address"]
     },
     username: {
         type: String,
-        trim: true,
         unique: true,
-        required: true
+        required: 'Username is required',
+        trim: true
     },
     password: {
         type: String,
@@ -25,39 +25,19 @@ var UserSchema = new Schema({
         },
             'Password should be longer']
     },
+    salt: {
+        type: String
+    },
     created: {
         type: Date,
         default: Date.now
     },
-    role: {
+    provider: {
         type: String,
-        enum: ['Admin', 'Owner', "User"]
+        required: 'Provider is required'
     },
-    website: {
-        type: String,
-        set: function (url) {
-            if (!url) {
-                return url;
-            } else {
-                if (url.indexOf('http://') !== 0 && url.indexOf('https://') !== 0) {
-                    url = 'http://' + url;
-                }
-
-                return url;
-            }
-        },
-        get: function (url) {
-            if (!url) {
-                return url;
-            } else {
-                if (url.indexOf('http://') !== 0 && url.indexOf('https://') !== 0) {
-                    url = 'http://' + url;
-                }
-
-                return url;
-            }
-        }
-    }
+    providerId: String,
+    providerData: {}
 });
 
 UserSchema.virtual('fullName').get(function () {
@@ -68,22 +48,53 @@ UserSchema.virtual('fullName').get(function () {
     this.lastName = splitName[1] || '';
 });
 
-UserSchema.set('toJSON', {getters: true, virtuals: true});
-
 UserSchema.statics.findOneByUsername = function (username, callback) {
     this.findOne({username: username}, callback);
 };
 
 UserSchema.method.authenticate = function (password) {
-    return this.password === password;
+    return this.password === this.hashPassword(password);
 };
 
-UserSchema.pre('save', function(next){
-    console.log('Function before save');
+UserSchema.pre('save', function (next) {
+    if (this.password) {
+        this.salt = new Buffer(crypto.randomByte(16).toString('base64'), 'base64');
+        this.password = this.hashPassword(this.password);
+    }
+
+    next();
 });
 
-UserSchema.post('save', function(next){
-    if(this.isNew){
+UserSchema.methods.hashPassword = function (password) {
+    return crypto.pbkdf2Sync(password, this.salt, 10000, 64).toString('base64');
+};
+
+UserSchema.statics.findUniqueUsername = function (username, suffix, calback) {
+    var _this = this;
+    var possibleUsername = username + (suffix || '');
+
+    _this.findOne({
+        username:possibleUsername
+    }, function (err, user) {
+        if(!err){
+            if(!user){
+                calback(possibleUsername);
+            } else {
+                return _this.findOneByUsername(username, (suffix || 0)+1, calback);
+            }
+        } else {
+            calback(null);
+        }
+    });
+};
+
+UserSchema.set('toJSON', {
+    getter:true,
+    virtuals:true
+});
+
+UserSchema.post('save', function (next) {
+    if (this.isNew) {
         console.log('A new user was created.');
     } else {
         console.log('A user updated it\'s details');
