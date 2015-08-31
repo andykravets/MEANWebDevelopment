@@ -23,7 +23,8 @@ var UserSchema = new Schema({
         validate: [function (password) {
             return password.length >= 6;
         },
-            'Password should be longer']
+            'Password should be longer'
+        ]
     },
     salt: {
         type: String
@@ -52,13 +53,13 @@ UserSchema.statics.findOneByUsername = function (username, callback) {
     this.findOne({username: username}, callback);
 };
 
-UserSchema.method.authenticate = function (password) {
+UserSchema.methods.authenticate = function (password) {
     return this.password === this.hashPassword(password);
 };
 
 UserSchema.pre('save', function (next) {
     if (this.password) {
-        this.salt = new Buffer(crypto.randomByte(16).toString('base64'), 'base64');
+        this.salt = new Buffer(crypto.randomBytes(16).toString('base64'), 'base64');
         this.password = this.hashPassword(this.password);
     }
 
@@ -74,13 +75,13 @@ UserSchema.statics.findUniqueUsername = function (username, suffix, calback) {
     var possibleUsername = username + (suffix || '');
 
     _this.findOne({
-        username:possibleUsername
+        username: possibleUsername
     }, function (err, user) {
-        if(!err){
-            if(!user){
+        if (!err) {
+            if (!user) {
                 calback(possibleUsername);
             } else {
-                return _this.findOneByUsername(username, (suffix || 0)+1, calback);
+                return _this.findOneByUsername(username, (suffix || 0) + 1, calback);
             }
         } else {
             calback(null);
@@ -89,8 +90,8 @@ UserSchema.statics.findUniqueUsername = function (username, suffix, calback) {
 };
 
 UserSchema.set('toJSON', {
-    getter:true,
-    virtuals:true
+    getter: true,
+    virtuals: true
 });
 
 UserSchema.post('save', function (next) {
